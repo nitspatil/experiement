@@ -1,0 +1,200 @@
+import streamlit as st
+import pandas as pd
+import plotly.graph_objects as go
+
+# --- PAGE CONFIGURATION ---
+# Use st.set_page_config() as the first Streamlit command.
+st.set_page_config(
+    page_title="Talent & Bench Management Hub",
+    page_icon="📊",
+    layout="wide"
+)
+
+# --- 1. DATA LOADING AND PREPARATION ---
+# TODO: PULL IN YOUR MASTER DATA SHEET HERE
+# Instead of using this mock dictionary, you can load your data from an Excel or CSV file.
+# For example, if your data is in 'master_data.xlsx':
+#
+# 1. Load the relevant sheets into pandas DataFrames:
+#    try:
+#        df_servicelines = pd.read_excel('master_data.xlsx', sheet_name='ServiceLines')
+#        # Assuming forecast data is in a single row in its sheet
+#        df_forecast = pd.read_excel('master_data.xlsx', sheet_name='BenchForecast').iloc[0]
+#        df_funnel = pd.read_excel('master_data.xlsx', sheet_name='InterviewFunnel')
+#        df_allocations = pd.read_excel('master_data.xlsx', sheet_name='RecentAllocations')
+#        df_talent = pd.read_excel('master_data.xlsx', sheet_name='TalentPool')
+#    except FileNotFoundError:
+#        st.error("Error: 'master_data.xlsx' not found. Please ensure the data file is in the same directory as the script.")
+#        st.stop() # Stop execution if the file isn't found
+#
+# 2. Then, adapt the code below to use these DataFrames.
+#    For instance, replace MOCK_DATA['serviceLines'].values() with a loop over `df_servicelines.to_dict('records')`.
+
+MOCK_DATA = {
+    'serviceLines': {
+        'dpe': {'name': "DPE", 'fullName': "Digital Process Engineering", 'total': 850, 'billed': 710, 'bench': 95, 'enablement': 45},
+        'cx': {'name': "CX", 'fullName': "Customer Experience", 'total': 620, 'billed': 550, 'bench': 40, 'enablement': 30},
+        'ci': {'name': "CI", 'fullName': "Cloud & Infrastructure", 'total': 480, 'billed': 410, 'bench': 55, 'enablement': 15},
+        'da': {'name': "DA", 'fullName': "Data & Analytics", 'total': 350, 'billed': 290, 'bench': 35, 'enablement': 25},
+    },
+    'benchForecast': {
+        'under15': 18,
+        'between16and30': 25,
+        'between31and45': 32,
+    },
+    # The funnel data and labels must be in the same order
+    'interviewFunnel': {'labels': ['New', 'Interviewed', 'Offered', 'Allocated'], 'values': [65, 55, 35, 25]},
+    'recentAllocations': [
+        {'id': 1, 'Name': 'Ananya Sharma', 'Previous Client': 'On Bench', 'New Client': 'CVS', 'Role': 'Sr. Java Developer', 'Recruiter': 'Rohan Gupta'},
+        {'id': 2, 'Name': 'Ben Carter', 'Previous Client': 'Walmart', 'New Client': 'Walmart (New POD)', 'Role': 'Data Engineer', 'Recruiter': 'Priya Singh'},
+        {'id': 3, 'Name': 'Chloe Davis', 'Previous Client': 'On Bench', 'New Client': 'United Health', 'Role': 'Cloud Architect', 'Recruiter': 'Rohan Gupta'},
+    ],
+    'talentPool': [
+        {'id': 1, 'Name': 'Vikram Rathore', 'EID': '10234', 'Status': 'On Bench', 'Previous Client': 'Walmart', 'Skills': 'Java, Spring, Kafka', 'Availability': 'Immediate', 'Bench Since': 'June 5', 'Process': 'Interviewing w/ CVS'},
+        {'id': 2, 'Name': 'Samantha Lee', 'EID': '10567', 'Status': 'Billed', 'Current Client': 'United Health', 'Skills': 'AWS, Terraform, Kubernetes', 'Availability': 'Project Ends: July 15', 'Bench Since': '-', 'Process': 'Not in process'},
+        {'id': 3, 'Name': 'Rajesh Kumar', 'EID': '10112', 'Status': 'On Bench', 'Previous Client': 'Morgan Stanley', 'Skills': 'Python, Spark, SQL', 'Availability': 'Immediate', 'Bench Since': 'May 20', 'Process': 'Offer from Walmart'},
+    ]
+}
+
+
+# --- 2. CHARTING FUNCTIONS ---
+
+def create_doughnut_chart(data):
+    """Generates a Plotly Doughnut chart for a service line."""
+    labels = ['Billed', 'Bench', 'Enablement']
+    values = [data['billed'], data['bench'], data['enablement']]
+
+    fig = go.Figure(
+        data=[go.Pie(
+            labels=labels,
+            values=values,
+            hole=0.7,
+            marker_colors=['#4f46e5', '#f97316', '#a8a29e'],
+            textinfo='none',
+            hoverinfo='label+percent+value',
+            sort=False # Keep the order Billed, Bench, Enablement
+        )]
+    )
+    fig.update_layout(
+        showlegend=True,
+        legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
+        margin=dict(t=0, b=0, l=0, r=0),
+        annotations=[dict(text=f"<b>{data['total']}</b>", x=0.5, y=0.5, font_size=24, showarrow=False)],
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        height=250
+    )
+    return fig
+
+def create_funnel_chart(data):
+    """Generates a Plotly horizontal Bar chart to act as a funnel."""
+    fig = go.Figure(go.Bar(
+        y=data['labels'],
+        x=data['values'],
+        orientation='h',
+        marker=dict(color=['#6366f1', '#818cf8', '#a5b4fc', '#c7d2fe'], line=dict(width=0)),
+        text=data['values'],
+        textposition='auto',
+    ))
+    fig.update_layout(
+        showlegend=False,
+        xaxis=dict(visible=False),
+        yaxis=dict(autorange="reversed"), # To show 'New' at the top
+        margin=dict(t=20, b=0, l=0, r=0),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        height=300,
+        font=dict(color="#1e293b")
+    )
+    return fig
+
+
+# --- 3. LAYOUT AND UI ---
+
+# --- Header ---
+st.title("Internal Talent & Bench Management Hub")
+st.markdown("A single source of truth for our internal talent landscape.")
+st.markdown("---")
+
+
+# --- Sidebar Filters ---
+st.sidebar.header("Global Filters")
+
+# NOTE: The selected values from these filters must be used to filter your pandas DataFrames.
+# This part is for UI demonstration. You need to add the filtering logic.
+# Example: `filtered_df = df[df['ServiceLine'].isin(selected_service_lines)]`
+
+selected_service_lines = st.sidebar.multiselect(
+    'Service Line',
+    options=[sl['name'] for sl in MOCK_DATA['serviceLines'].values()],
+    default=[sl['name'] for sl in MOCK_DATA['serviceLines'].values()]
+)
+
+selected_date_range = st.sidebar.selectbox(
+    'Date Range',
+    options=['Last 30 Days', 'Last Quarter', 'Last 6 Months']
+)
+
+
+# --- Section 1: Command Center ---
+st.header("Service Line Command Center")
+service_line_cols = st.columns(4)
+
+# Note: This logic assumes you will filter the data based on `selected_service_lines` from the sidebar
+# For this mock example, it displays all of them.
+for i, sl_data in enumerate(MOCK_DATA['serviceLines'].values()):
+    if sl_data['name'] in selected_service_lines:
+        with service_line_cols[i % 4]: # Use modulo to wrap columns if needed
+            with st.container(border=True):
+                st.subheader(f"{sl_data['name']}")
+                st.caption(sl_data['fullName'])
+                fig = create_doughnut_chart(sl_data)
+                st.plotly_chart(fig, use_container_width=True)
+
+
+# --- Section 2: Upcoming Bench Forecast ---
+st.header("Upcoming Bench Forecast")
+forecast_cols = st.columns(3)
+
+with forecast_cols[0]:
+    st.metric(label="Coming to Bench (<15 Days)", value=MOCK_DATA['benchForecast']['under15'])
+with forecast_cols[1]:
+    st.metric(label="Coming to Bench (16-30 Days)", value=MOCK_DATA['benchForecast']['between16and30'])
+with forecast_cols[2]:
+    st.metric(label="Coming to Bench (31-45 Days)", value=MOCK_DATA['benchForecast']['between31and45'])
+
+st.markdown("---")
+
+# --- Section 3: Talent Pipeline & Activity ---
+st.header("Talent Pipeline & Activity")
+pipeline_cols = st.columns([2, 3]) # Allocate space for funnel and table
+
+with pipeline_cols[0]:
+     with st.container(border=True):
+        st.subheader("Bench Interview Funnel")
+        st.caption("Internal mobility pipeline.")
+        funnel_fig = create_funnel_chart(MOCK_DATA['interviewFunnel'])
+        st.plotly_chart(funnel_fig, use_container_width=True)
+
+with pipeline_cols[1]:
+    with st.container(border=True):
+        st.subheader("Recent Allocations")
+        st.caption("Successful placements in the last 30 days.")
+        # Create a 'Movement' column for better display
+        df_allocations = pd.DataFrame(MOCK_DATA['recentAllocations'])
+        df_allocations['Movement'] = df_allocations['Previous Client'] + " → " + df_allocations['New Client']
+        st.dataframe(
+            df_allocations[['Name', 'Movement', 'Role', 'Recruiter']],
+            hide_index=True,
+            use_container_width=True
+        )
+
+# --- Section 4: Talent Pool Explorer ---
+st.header("Talent Pool Explorer")
+with st.container(border=True):
+    # Convert talent pool dict to DataFrame for display
+    df_talent_pool = pd.DataFrame(MOCK_DATA['talentPool'])
+
+    # NOTE: Streamlit's dataframe doesn't support rich formatting like colored tags or icons within cells.
+    # The data is presented clearly in a standard tabular format.
+    st.dataframe(df_talent_pool, hide_index=True, use_container_width=True)
